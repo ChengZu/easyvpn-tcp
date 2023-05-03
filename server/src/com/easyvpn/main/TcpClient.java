@@ -64,41 +64,34 @@ public class TcpClient implements Runnable {
 			e.printStackTrace();
 		}
 	}
-
+	
 	@Override
 	public void run() {
 		try {
-			int size = 0;
+			int readSize = 0;
 			byte[] readBytes = new byte[Packet.IP4_HEADER_SIZE];
-			size = is.read(readBytes);
-			if (size == Packet.IP4_HEADER_SIZE) {
-				IPHeader header = new IPHeader(readBytes, 0);
-				protocol = header.getProtocol();
-				if(protocol == IPHeader.TCP) {
-					ip = header.getSourceIP();
-					port = header.getDestinationIP();
-					tcpProxy = new TcpProxy(this, ip, port);
-					if(tcpProxy.isClose()) {
-						close(true);
-						return;
-					}
-				}else if(protocol == IPHeader.UDP) {
-					UdpClient UdpClient = new UdpClient(this.socket);
-					this.udpClientManage.addClient(UdpClient);
-					return;
-				}else {
-					System.out.println("bad header value");
-					close(false);
-					return;
-				}
-			}else {
-				System.out.println("bad header size");
-				close(false);
+			while (readSize < Packet.IP4_HEADER_SIZE) {
+				int size = is.read(readBytes, readSize, Packet.IP4_HEADER_SIZE - readSize);
+				if(size == -1) return;
+				readSize += size;
+			}
+
+			IPHeader header = new IPHeader(readBytes, 0);
+			protocol = header.getProtocol();
+			if (protocol == IPHeader.TCP) {
+				ip = header.getSourceIP();
+				port = header.getDestinationIP();
+				tcpProxy = new TcpProxy(this, ip, port);
+			} else if (protocol == IPHeader.UDP) {
+				UdpClient UdpClient = new UdpClient(this.socket);
+				this.udpClientManage.addClient(UdpClient);
+				return;
+			} else {
+				System.out.println("fist packet bad header value");
 				return;
 			}
-			
-			
-			
+
+			int size = 0;
 			byte[] packet = new byte[Config.MUTE];
 			while (size != -1 && !isClose()) {
 				size = is.read(packet);
@@ -108,9 +101,9 @@ public class TcpClient implements Runnable {
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			//e.printStackTrace();
+			// e.printStackTrace();
 		} finally {
-			if(this.protocol == IPHeader.TCP)
+			if (this.protocol != IPHeader.UDP) //此TcpClient保存在Server中, udpClientManage 进行关闭
 				close(true);
 		}
 	}
